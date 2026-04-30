@@ -11,10 +11,10 @@ class DashboardAnalyticsView(APIView):
         claims = Claim.objects.filter(user=request.user)
 
         return Response({
-            "total_claims": claims.count(),
+            "total_claims":    claims.count(),
             "verified_claims": claims.filter(status='verified').count(),
-            "pending_claims": claims.filter(status='pending').count(),
-            "rejected_claims": claims.filter(status='rejected').count()
+            "pending_claims":  claims.filter(status='pending').count(),
+            "rejected_claims": claims.filter(status='rejected').count(),
         })
 
 
@@ -22,19 +22,19 @@ class NotificationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        claims = Claim.objects.filter(user=request.user)
+        claims = Claim.objects.filter(user=request.user).order_by('-created_at')[:20]
 
-        notifications = []
-
-        for claim in claims:
-            notifications.append({
+        notifications = [
+            {
                 "claim_id": claim.id,
-                "message": f"Your claim is currently {claim.status}"
-            })
+                "title":    claim.title or f"Claim #{claim.id}",
+                "message":  f"Your claim is currently {claim.status}",
+                "status":   claim.status,
+            }
+            for claim in claims
+        ]
 
-        return Response({
-            "notifications": notifications
-        })
+        return Response({"notifications": notifications})
 
 
 class ExportReportView(APIView):
@@ -43,39 +43,36 @@ class ExportReportView(APIView):
     def get(self, request):
         claims = Claim.objects.filter(user=request.user)
 
-        export_data = []
+        export_data = [
+            {
+                "claim_id":   claim.id,
+                "title":      claim.title or f"Claim #{claim.id}",
+                "status":     claim.status,
+                "created_at": claim.created_at,
+            }
+            for claim in claims
+        ]
 
-        for claim in claims:
-            export_data.append({
-                "claim_id": claim.id,
-                "title": claim.title,
-                "status": claim.status
-            })
-
-        return Response({
-            "export_data": export_data
-        })
+        return Response({"export_data": export_data})
 
 
 class AdminReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        claims = Claim.objects.all()
+        claims = Claim.objects.select_related('user').all()
 
-        all_claims = []
-
-        for claim in claims:
-            all_claims.append({
+        all_claims = [
+            {
                 "claim_id": claim.id,
-                "title": claim.title,
-                "status": claim.status,
-                "user": claim.user.email
-            })
+                "title":    claim.title or f"Claim #{claim.id}",
+                "status":   claim.status,
+                "user":     getattr(claim.user, 'email', str(claim.user)),
+            }
+            for claim in claims
+        ]
 
-        return Response({
-            "claims": all_claims
-        })
+        return Response({"claims": all_claims})
 
 
 class ClaimHistoryView(APIView):
@@ -84,19 +81,17 @@ class ClaimHistoryView(APIView):
     def get(self, request):
         claims = Claim.objects.filter(user=request.user).order_by('-created_at')
 
-        history = []
+        history = [
+            {
+                "claim_id":   claim.id,
+                "title":      claim.title or f"Claim #{claim.id}",
+                "status":     claim.status,
+                "created_at": claim.created_at,
+            }
+            for claim in claims
+        ]
 
-        for claim in claims:
-            history.append({
-                "claim_id": claim.id,
-                "title": claim.title,
-                "status": claim.status,
-                "created_at": claim.created_at
-            })
-
-        return Response({
-            "history": history
-        })
+        return Response({"history": history})
 
 
 class ClaimInsightsView(APIView):
@@ -104,21 +99,22 @@ class ClaimInsightsView(APIView):
 
     def get(self, request):
         claims = Claim.objects.filter(user=request.user)
+        total = claims.count()
 
         insights = {
-            "total_claims": claims.count(),
+            "total_claims": total,
             "verified_percentage": (
-                (claims.filter(status='verified').count() / claims.count()) * 100
-                if claims.count() > 0 else 0
+                round((claims.filter(status='verified').count() / total) * 100, 1)
+                if total > 0 else 0
             ),
             "pending_percentage": (
-                (claims.filter(status='pending').count() / claims.count()) * 100
-                if claims.count() > 0 else 0
+                round((claims.filter(status='pending').count() / total) * 100, 1)
+                if total > 0 else 0
             ),
             "rejected_percentage": (
-                (claims.filter(status='rejected').count() / claims.count()) * 100
-                if claims.count() > 0 else 0
-            )
+                round((claims.filter(status='rejected').count() / total) * 100, 1)
+                if total > 0 else 0
+            ),
         }
 
         return Response(insights)
@@ -131,20 +127,17 @@ class ClaimReportView(APIView):
         try:
             claim = Claim.objects.get(id=claim_id, user=request.user)
 
-            report = {
-                "claim_id": claim.id,
-                "title": claim.title,
-                "description": claim.description,
-                "status": claim.status,
-                "document": str(claim.document) if claim.document else None
-            }
-
-            return Response(report)
+            return Response({
+                "claim_id":    claim.id,
+                "title":       claim.title or f"Claim #{claim.id}",
+                "description": claim.description or "",
+                "status":      claim.status,
+                "document":    str(claim.document) if claim.document else None,
+                "created_at":  claim.created_at,
+            })
 
         except Claim.DoesNotExist:
-            return Response({
-                "error": "Claim not found"
-            }, status=404)
+            return Response({"error": "Claim not found"}, status=404)
 
 
 class ComplianceCheckView(APIView):
@@ -154,14 +147,19 @@ class ComplianceCheckView(APIView):
         try:
             claim = Claim.objects.get(id=claim_id, user=request.user)
 
-            compliance_status = "compliant" if claim.status == "verified" else "non-compliant"
+            is_compliant = claim.status == "verified"
 
             return Response({
-                "claim_id": claim.id,
-                "compliance_status": compliance_status
+                "claim_id":          claim.id,
+                "compliance_status": "compliant" if is_compliant else "non-compliant",
+                "compliance_score":  100 if is_compliant else 0,
+                "risk_level":        "Low Risk" if is_compliant else "High Risk",
+                "recommendation": (
+                    "Claim follows treatment guidelines. Approved for processing."
+                    if is_compliant else
+                    "Claim has compliance issues. Manual review recommended."
+                ),
             })
 
         except Claim.DoesNotExist:
-            return Response({
-                "error": "Claim not found"
-            }, status=404)
+            return Response({"error": "Claim not found"}, status=404)
