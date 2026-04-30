@@ -60,6 +60,13 @@ class AdminReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # Only staff/admin users can see all claims
+        if not request.user.is_staff:
+            return Response(
+                {"error": "You do not have permission to access this resource."},
+                status=403
+            )
+
         claims = Claim.objects.select_related('user').all()
 
         all_claims = [

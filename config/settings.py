@@ -4,6 +4,7 @@ Django settings for config project.
 
 import os
 from pathlib import Path
+from datetime import timedelta
 import dj_database_url
 
 # Base directory
@@ -20,8 +21,19 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv(
     "ALLOWED_HOSTS",
-    "127.0.0.1,localhost"
+    "127.0.0.1,localhost,nha-backend.onrender.com"
 ).split(",")
+
+# Security headers (active in production)
+if not DEBUG:
+    SECURE_HSTS_SECONDS          = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD          = True
+    SECURE_SSL_REDIRECT          = True
+    SESSION_COOKIE_SECURE        = True
+    CSRF_COOKIE_SECURE           = True
+SECURE_CONTENT_TYPE_NOSNIFF  = True
+X_FRAME_OPTIONS               = 'DENY'
 
 
 # Installed apps
@@ -132,8 +144,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# CORS
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS — only allow requests from known frontend origins
+_frontend_url = os.getenv("FRONTEND_URL", "").strip()
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+] + ([_frontend_url] if _frontend_url else [])
+CORS_ALLOW_CREDENTIALS = True
 
 
 # DRF + JWT
@@ -146,6 +164,13 @@ REST_FRAMEWORK = {
     ),
 }
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS':  True,
+    'BLACKLIST_AFTER_ROTATION': False,
+}
+
 
 # Custom user model
-AUTH_USER_MODEL = 'accounts.User'
+AUTH_USER_MODEL = 'accounts.User'

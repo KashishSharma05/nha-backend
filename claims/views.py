@@ -137,26 +137,48 @@ class ClaimTimelineView(APIView):
 class ClaimDocumentUploadView(APIView):
     permission_classes = [IsAuthenticated]
 
+    ALLOWED_TYPES = {'application/pdf', 'image/jpeg', 'image/jpg', 'image/png'}
+    ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+    MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
     def post(self, request, claim_id):
         try:
             claim = Claim.objects.get(id=claim_id, user=request.user)
-
             document = request.FILES.get('document')
 
-            if document:
-                claim.document = document
-                claim.save()
+            if not document:
+                return Response({"error": "No document uploaded"}, status=400)
 
-                return Response({
-                    "message": "Document uploaded successfully",
-                    "claim_id": claim.id
-                })
+            # Validate file size
+            if document.size > self.MAX_SIZE_BYTES:
+                return Response(
+                    {"error": "File too large. Maximum allowed size is 10 MB."},
+                    status=400
+                )
+
+            # Validate file extension
+            import os as _os
+            ext = _os.path.splitext(document.name)[1].lower()
+            if ext not in self.ALLOWED_EXTENSIONS:
+                return Response(
+                    {"error": f"Invalid file type '{ext}'. Only PDF, JPG, and PNG are allowed."},
+                    status=400
+                )
+
+            # Validate MIME type
+            if document.content_type not in self.ALLOWED_TYPES:
+                return Response(
+                    {"error": "Invalid file content type. Only PDF, JPG, and PNG are allowed."},
+                    status=400
+                )
+
+            claim.document = document
+            claim.save()
 
             return Response({
-                "error": "No document uploaded"
-            }, status=400)
+                "message": "Document uploaded successfully",
+                "claim_id": claim.id
+            })
 
         except Claim.DoesNotExist:
-            return Response({
-                "error": "Claim not found"
-            }, status=404)
+            return Response({"error": "Claim not found"}, status=404)
