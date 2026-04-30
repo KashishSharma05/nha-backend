@@ -10,12 +10,23 @@ class DashboardAnalyticsView(APIView):
 
     def get(self, request):
         claims = Claim.objects.filter(user=request.user)
+        
+        # Generate risk alerts for rejected claims
+        risk_alerts = []
+        rejected = claims.filter(status='rejected').order_by('-created_at')[:5]
+        for c in rejected:
+            risk_alerts.append({
+                "id": c.id,
+                "title": f"High Risk: Claim #{c.id} Rejected",
+                "message": f"Claim #{c.id} failed NHA STG compliance checks. Review immediately."
+            })
 
         return Response({
             "total_claims":    claims.count(),
             "verified_claims": claims.filter(status='verified').count(),
             "pending_claims":  claims.filter(status='pending').count(),
             "rejected_claims": claims.filter(status='rejected').count(),
+            "risk_alert_list": risk_alerts,
         })
 
 
