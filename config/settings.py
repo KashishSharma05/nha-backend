@@ -2,6 +2,7 @@
 Django settings for config project.
 """
 
+import os
 from pathlib import Path
 
 # Base directory
@@ -9,8 +10,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Security
-import os
-
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "django-insecure-_tmmx+*)kg+-9k9beg90wq7*t9#i*n2l#h2f9v!@5gzwj*08i-"
@@ -50,6 +49,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',   # added
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -121,7 +121,11 @@ USE_TZ = True
 
 
 # Static files
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise static files storage
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # Media files
@@ -146,4 +150,5 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ),
 }
+
 AUTH_USER_MODEL = 'accounts.User'
