@@ -14,15 +14,16 @@ class Claim(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE
     )
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    document = models.FileField(upload_to='claims/')
-    status = models.CharField(
+    title       = models.CharField(max_length=255, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+    document    = models.FileField(upload_to='claims/', blank=True, null=True)
+    source      = models.CharField(max_length=50, blank=True, default='')
+    status      = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
         default='pending'
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.title
+        return self.title or f"Claim #{self.id}"
