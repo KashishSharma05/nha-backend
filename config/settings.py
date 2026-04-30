@@ -9,16 +9,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Security
-SECRET_KEY = 'django-insecure-_tmmx+*)kg+-9k9beg90wq7*t9#i*n2l#h2f9v!@5gzwj*08i-'
+import os
 
-DEBUG = True
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "django-insecure-_tmmx+*)kg+-9k9beg90wq7*t9#i*n2l#h2f9v!@5gzwj*08i-"
+)
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-    ".railway.app",
-    "web-production-02d3d.up.railway.app"
-]
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "127.0.0.1,localhost"
+).split(",")
 
 
 # Installed apps
