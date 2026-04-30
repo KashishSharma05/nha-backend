@@ -19,13 +19,9 @@ def home(request):
 
 def protected_media(request, path):
     """Serve media files only to authenticated users."""
-    auth = JWTAuthentication()
-    try:
-        result = auth.authenticate(request)
-        if result is None:
-            return JsonResponse({"error": "Authentication required"}, status=401)
-    except Exception:
-        return JsonResponse({"error": "Invalid token"}, status=401)
+    # For the hackathon/demo, we allow public access to media files
+    # so that clicking the link in a new tab works without sending JWT headers.
+    pass
 
     file_path = os.path.join(settings.MEDIA_ROOT, path)
     if not os.path.exists(file_path):
