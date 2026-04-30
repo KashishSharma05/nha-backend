@@ -128,32 +128,41 @@ class ClaimInsightsView(APIView):
         return Response(insights)
 
 
+def _build_claim_data(claim):
+    """Extract all compliance-relevant fields from a Claim instance."""
+    return {
+        "diagnosis_code":             claim.diagnosis_code,
+        "ward_type":                  getattr(claim, 'ward_type', 'general_ward'),
+        "patient_age":                claim.patient_age,
+        "alos":                       claim.alos,
+        "hb_level":                   claim.hb_level,
+        "claimed_amount":             claim.claimed_amount,
+        "fever_duration_days":        getattr(claim, 'fever_duration_days', None),
+        "has_diagnostic_report":      claim.has_diagnostic_report,
+        "has_clinical_notes":         claim.has_clinical_notes,
+        "has_indoor_case_papers":     claim.has_indoor_case_papers,
+        "has_operative_note":         claim.has_operative_note,
+        "has_discharge_summary":      claim.has_discharge_summary,
+        "has_treatment_records":      claim.has_treatment_records,
+        "has_post_treatment_report":  claim.has_post_treatment_report,
+        "has_histopathology_report":  claim.has_histopathology_report,
+        "has_cbc_report":             claim.has_cbc_report,
+        "has_implant_invoice":        claim.has_implant_invoice,
+        "has_preop_xray":             claim.has_preop_xray,
+        "has_lft_report":             getattr(claim, 'has_lft_report', False),
+        "has_pre_anesthesia_report":  getattr(claim, 'has_pre_anesthesia_report', False),
+        "has_postop_photo":           getattr(claim, 'has_postop_photo', False),
+        "has_previous_cholecystectomy": getattr(claim, 'has_previous_cholecystectomy', False),
+    }
+
+
 class ClaimReportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, claim_id):
         try:
-            claim = Claim.objects.get(id=claim_id, user=request.user)
-
-            # Run compliance engine to get verdict and payable amount
-            result = check_compliance({
-                "diagnosis_code":           claim.diagnosis_code,
-                "patient_age":              claim.patient_age,
-                "alos":                     claim.alos,
-                "hb_level":                 claim.hb_level,
-                "claimed_amount":           claim.claimed_amount,
-                "has_diagnostic_report":    claim.has_diagnostic_report,
-                "has_clinical_notes":       claim.has_clinical_notes,
-                "has_indoor_case_papers":   claim.has_indoor_case_papers,
-                "has_operative_note":       claim.has_operative_note,
-                "has_discharge_summary":    claim.has_discharge_summary,
-                "has_treatment_records":    claim.has_treatment_records,
-                "has_post_treatment_report":claim.has_post_treatment_report,
-                "has_histopathology_report":claim.has_histopathology_report,
-                "has_cbc_report":           claim.has_cbc_report,
-                "has_implant_invoice":      claim.has_implant_invoice,
-                "has_preop_xray":           claim.has_preop_xray,
-            })
+            claim  = Claim.objects.get(id=claim_id, user=request.user)
+            result = check_compliance(_build_claim_data(claim))
 
             return Response({
                 "claim_id":       claim.id,
@@ -163,7 +172,9 @@ class ClaimReportView(APIView):
                 "created_at":     claim.created_at,
                 "diagnosis_code": claim.diagnosis_code,
                 "procedure_name": result["procedure_name"],
-                # Compliance fields
+                "specialty":      result.get("specialty", ""),
+                "alos_range":     result.get("alos_range", []),
+                # Compliance
                 "verdict":          result["verdict"],
                 "compliance_score": result["compliance_score"],
                 "risk_level":       result["risk_level"],
@@ -187,26 +198,8 @@ class ComplianceCheckView(APIView):
 
     def get(self, request, claim_id):
         try:
-            claim = Claim.objects.get(id=claim_id, user=request.user)
-
-            result = check_compliance({
-                "diagnosis_code":           claim.diagnosis_code,
-                "patient_age":              claim.patient_age,
-                "alos":                     claim.alos,
-                "hb_level":                 claim.hb_level,
-                "claimed_amount":           claim.claimed_amount,
-                "has_diagnostic_report":    claim.has_diagnostic_report,
-                "has_clinical_notes":       claim.has_clinical_notes,
-                "has_indoor_case_papers":   claim.has_indoor_case_papers,
-                "has_operative_note":       claim.has_operative_note,
-                "has_discharge_summary":    claim.has_discharge_summary,
-                "has_treatment_records":    claim.has_treatment_records,
-                "has_post_treatment_report":claim.has_post_treatment_report,
-                "has_histopathology_report":claim.has_histopathology_report,
-                "has_cbc_report":           claim.has_cbc_report,
-                "has_implant_invoice":      claim.has_implant_invoice,
-                "has_preop_xray":           claim.has_preop_xray,
-            })
+            claim  = Claim.objects.get(id=claim_id, user=request.user)
+            result = check_compliance(_build_claim_data(claim))
 
             # Update claim status based on verdict
             if result["verdict"] == "APPROVED":
@@ -219,6 +212,7 @@ class ComplianceCheckView(APIView):
                 "claim_id":           claim.id,
                 "diagnosis_code":     result["diagnosis_code"],
                 "procedure_name":     result["procedure_name"],
+                "specialty":          result.get("specialty", ""),
                 "compliance_status":  "compliant" if result["verdict"] == "APPROVED" else "non-compliant",
                 "compliance_score":   result["compliance_score"],
                 "risk_level":         result["risk_level"],
@@ -230,6 +224,7 @@ class ComplianceCheckView(APIView):
                 "recommendation":     result["recommendation"],
                 "payable_amount":     result["payable_amount"],
                 "total_claimed":      result["total_claimed"],
+                "alos_range":         result.get("alos_range", []),
             })
 
         except Claim.DoesNotExist:
