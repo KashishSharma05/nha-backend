@@ -14,9 +14,10 @@ SECRET_KEY = 'django-insecure-_tmmx+*)kg+-9k9beg90wq7*t9#i*n2l#h2f9v!@5gzwj*08i-
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    '127.0.0.1',
-    'localhost',
-    'ice-oak-reggae.ngrok-free.dev'
+    "127.0.0.1",
+    "localhost",
+    ".railway.app",
+    "web-production-02d3d.up.railway.app"
 ]
 
 
