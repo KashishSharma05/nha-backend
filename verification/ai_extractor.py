@@ -28,34 +28,61 @@ def extract_clinical_data_from_pdf(pdf_file_path):
         # Initialize the model
         model = genai.GenerativeModel('gemini-1.5-flash')
 
-        # Define the strong JSON prompt
+        # Define the strong, architected JSON prompt
         prompt = """
-        You are a highly advanced medical auditor working for the National Health Authority (NHA) PMJAY.
-        Your task is to analyze the attached uploaded medical dossier (which may contain clinical notes, blood reports, X-rays, discharge summaries, etc.).
+        <ROLE>
+        You are an expert NHA (National Health Authority) Medical Auditor for PMJAY. 
+        Your task is to perform an exhaustive, highly accurate review of the attached hospital IPD dossier.
+        </ROLE>
 
-        Extract the following data and return it as a JSON object. 
-        CRITICAL EDGE CASES:
-        1. If a value is not found or unreadable, return null. DO NOT hallucinate or guess.
-        2. For checkboxes (has_*), return true ONLY if you explicitly see the document inside the file. If absent, return false.
-        3. ALOS: Calculate the Actual Length of Stay in days based on admission and discharge dates. If dates are missing, return null.
+        <OBJECTIVE>
+        Analyze the document to extract exact clinical parameters and verify the presence of mandatory compliance documents.
+        You must output ONLY a valid JSON object matching the schema below.
+        </OBJECTIVE>
 
+        <DOCUMENT_DEFINITIONS>
+        - "diagnostic_report": Pathology (CBC/Hb) or Radiology (USG/X-Ray) reports from a lab.
+        - "clinical_notes": Doctor's handwritten or typed evaluation notes detailing patient history and examination.
+        - "indoor_case_papers": Daily nursing charts, TPR (Temp/Pulse/Resp) charts, or daily ward progress notes.
+        - "operative_note": A surgical procedure note detailing the anesthesia, incision, and surgical steps.
+        - "discharge_summary": The final summary given to the patient upon leaving, containing admission/discharge dates and treatment summary.
+        - "treatment_records": Medication charts showing antibiotics or blood transfusion logs.
+        </DOCUMENT_DEFINITIONS>
+
+        <CONSTRAINTS_AND_RULES>
+        1. NO HALLUCINATIONS: If a value or document is not explicitly present, you MUST return null (for data) or false (for documents).
+        2. DO NOT GUESS ALOS: Actual Length of Stay (alos) must be calculated exactly as (Discharge Date - Admission Date). If either is missing, return null.
+        3. FRAUD DETECTION: Check the history carefully. If the patient is undergoing a cholecystectomy, do they mention having their gallbladder removed previously?
+        </CONSTRAINTS_AND_RULES>
+
+        <OUTPUT_SCHEMA>
+        Return exactly this JSON structure:
         {
-            "patient_age": <integer or null>,
-            "hb_level": <float or null> (look for Hemoglobin, Hb, HGB in blood reports),
-            "alos": <integer or null>,
-            "fever_duration_days": <integer or null>,
+            "reasoning_chain": "Briefly explain your step-by-step search for the clinical data and the mandatory documents. This improves your accuracy.",
             
-            "has_diagnostic_report": <boolean>,
-            "has_clinical_notes": <boolean>,
-            "has_lft_report": <boolean>,
-            "has_indoor_case_papers": <boolean>,
-            "has_operative_note": <boolean>,
-            "has_pre_anesthesia_report": <boolean>,
-            "has_discharge_summary": <boolean>,
-            "has_treatment_records": <boolean>,
+            "clinical_data": {
+                "patient_age": <integer or null>,
+                "hb_level": <float or null> (Hemoglobin level in g/dL),
+                "alos": <integer or null>,
+                "fever_duration_days": <integer or null>
+            },
             
-            "has_previous_cholecystectomy": <boolean>
+            "mandatory_documents_found": {
+                "has_diagnostic_report": <boolean>,
+                "has_clinical_notes": <boolean>,
+                "has_lft_report": <boolean>,
+                "has_indoor_case_papers": <boolean>,
+                "has_operative_note": <boolean>,
+                "has_pre_anesthesia_report": <boolean>,
+                "has_discharge_summary": <boolean>,
+                "has_treatment_records": <boolean>
+            },
+            
+            "fraud_flags": {
+                "has_previous_cholecystectomy": <boolean>
+            }
         }
+        </OUTPUT_SCHEMA>
         """
 
         print("Requesting extraction from Gemini 1.5 Flash...")
@@ -64,8 +91,22 @@ def extract_clinical_data_from_pdf(pdf_file_path):
             generation_config=genai.GenerationConfig(response_mime_type="application/json")
         )
 
-        extracted_data = json.loads(response.text)
-        extracted_data["success"] = True
+        extracted_json = json.loads(response.text)
+        
+        # Flatten the nested JSON structure for the frontend
+        extracted_data = {
+            "patient_age": extracted_json["clinical_data"].get("patient_age"),
+            "hb_level": extracted_json["clinical_data"].get("hb_level"),
+            "alos": extracted_json["clinical_data"].get("alos"),
+            "fever_duration_days": extracted_json["clinical_data"].get("fever_duration_days"),
+            "has_previous_cholecystectomy": extracted_json["fraud_flags"].get("has_previous_cholecystectomy", False),
+            "success": True,
+            "reasoning": extracted_json.get("reasoning_chain", "")
+        }
+        
+        # Merge document checkboxes
+        extracted_data.update(extracted_json["mandatory_documents_found"])
+        
         return extracted_data
 
     except json.JSONDecodeError:
