@@ -150,6 +150,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
+    "https://nha-frontend.vercel.app",
 ] + ([_frontend_url] if _frontend_url else [])
 CORS_ALLOW_CREDENTIALS = True
 
@@ -173,4 +174,4 @@ SIMPLE_JWT = {
 
 
 # Custom user model
-AUTH_USER_MODEL = 'accounts.User'
+AUTH_USER_MODEL = 'accounts.User'
