@@ -9,6 +9,7 @@ from .models import User
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    authentication_classes = []
 
 
 class UserProfileView(APIView):
@@ -26,6 +27,7 @@ class UserProfileView(APIView):
 
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         email = request.data.get("email")
