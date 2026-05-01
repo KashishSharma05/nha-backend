@@ -5,7 +5,14 @@ from .views import (
     ClaimTimelineView,
     ClaimDetailView,
     ClaimUpdateView,
-    ClaimDeleteView,ClaimDocumentUploadView,ClaimSearchView,ClaimFilterView,ClaimStatusSummaryView,BulkClaimCreateView
+    ClaimDeleteView,
+    ClaimDocumentUploadView,
+    ClaimSearchView,
+    ClaimFilterView,
+    ClaimStatusSummaryView,
+    BulkClaimCreateView,
+    PS1GenerateView,
+    PS1ResultView,
 )
 
 urlpatterns = [
@@ -20,4 +27,8 @@ urlpatterns = [
     path('filter/', ClaimFilterView.as_view()),
     path('summary/', ClaimStatusSummaryView.as_view()),
     path('bulk-create/', BulkClaimCreateView.as_view()),
-]
+
+    # PS-1 output endpoints
+    path('ps1/generate/<int:claim_id>/', PS1GenerateView.as_view(), name='ps1-generate'),
+    path('ps1/result/<int:claim_id>/',   PS1ResultView.as_view(),   name='ps1-result'),
+]

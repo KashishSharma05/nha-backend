@@ -1,19 +1,19 @@
 import os
 import json
-import tempfile
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
-# Setup Gemini API (The user must provide GEMINI_API_KEY in .env)
-api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
+# Setup Gemini API client
+_api_key = os.getenv("GEMINI_API_KEY")
+_client  = genai.Client(api_key=_api_key) if _api_key else None
+
 
 def extract_clinical_data_from_pdf(pdf_file_path):
     """
-    Sends the PDF to Gemini 1.5 Flash to automatically extract clinical parameters
+    Sends the PDF to Gemini 2.0 Flash to automatically extract clinical parameters
     and detect the presence of mandatory documents based on the NHA STG rules.
     """
-    if not api_key:
+    if not _client:
         return {
             "error": "Gemini API key is missing. Add GEMINI_API_KEY to your .env file.",
             "success": False
@@ -23,10 +23,7 @@ def extract_clinical_data_from_pdf(pdf_file_path):
     try:
         # Upload the file to Gemini's File API
         print(f"Uploading {pdf_file_path} to Gemini...")
-        gemini_file = genai.upload_file(pdf_file_path)
-
-        # Initialize the model
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        gemini_file = _client.files.upload(file=pdf_file_path)
 
         # Define the strong, architected JSON prompt
         prompt = """
@@ -85,10 +82,13 @@ def extract_clinical_data_from_pdf(pdf_file_path):
         </OUTPUT_SCHEMA>
         """
 
-        print("Requesting extraction from Gemini 1.5 Flash...")
-        response = model.generate_content(
-            [gemini_file, prompt],
-            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+        print("Requesting extraction from Gemini 2.0 Flash...")
+        response = _client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[gemini_file, prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            ),
         )
 
         extracted_json = json.loads(response.text)
@@ -118,10 +118,10 @@ def extract_clinical_data_from_pdf(pdf_file_path):
         print(f"Gemini Extraction Error: {error_msg}")
         return {"error": error_msg, "success": False}
     finally:
-        # Edge Case: Clean up the uploaded file from Google's servers to avoid storage quota issues
+        # Clean up the uploaded file from Google's servers
         if gemini_file:
             try:
-                genai.delete_file(gemini_file.name)
+                _client.files.delete(name=gemini_file.name)
                 print(f"Deleted temporary file {gemini_file.name} from Gemini Cloud.")
             except Exception as cleanup_error:
                 print(f"Failed to delete file from Gemini Cloud: {cleanup_error}")
