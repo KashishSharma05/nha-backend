@@ -1,4 +1,4 @@
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -10,6 +10,17 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response({
+            "message": "User registered successfully",
+            "username": user.username,
+            "email": user.email
+        }, status=status.HTTP_201_CREATED)
 
 
 class UserProfileView(APIView):
@@ -32,6 +43,11 @@ class ForgotPasswordView(APIView):
     def post(self, request):
         email = request.data.get("email")
 
+        if not email:
+            return Response({
+                "error": "Email is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(email=email)
 
@@ -43,4 +59,4 @@ class ForgotPasswordView(APIView):
         except User.DoesNotExist:
             return Response({
                 "error": "User not found"
-            }, status=404)
+            }, status=status.HTTP_404_NOT_FOUND)
